@@ -571,17 +571,11 @@
   function sceneSock(){
     scene.innerHTML = `${gardenBG()}
       <g fill="#a77bd6" opacity=".8">${Array.from({length: 22}, (_, i) => `<ellipse cx="${(i*67)%800}" cy="${330 + (i*29)%80}" rx="5" ry="2.5"/>`).join('')}</g>
+      <g transform="translate(400,394)"><path d="M0 0 v-14" stroke="#4f9a3e" stroke-width="3"/><g fill="#fff"><ellipse cx="0" cy="-22" rx="3.5" ry="7"/><ellipse cx="0" cy="-8" rx="3.5" ry="7"/><ellipse cx="-7" cy="-15" rx="7" ry="3.5"/><ellipse cx="7" cy="-15" rx="7" ry="3.5"/></g><circle cx="0" cy="-15" r="4" fill="#ffd43b"/></g>
       <g id="dogs">${dogSVG('nala')}${dogSVG('poppy')}</g>
       <path id="sock" d="" stroke="#ffffff" stroke-width="13" fill="none" stroke-linecap="round"/>
       <path id="sockStripe" d="" stroke="#e2483a" stroke-width="13" fill="none" stroke-dasharray="9 16"/>
       <g id="glow" opacity="0"><circle r="60" fill="#ffe27a" opacity=".35"/><text y="-50" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="30" fill="#ff9a2e">!</text></g>
-      <g id="tugbar" transform="translate(400,62)">
-        <rect x="-150" y="-9" width="300" height="18" rx="9" fill="#fff" opacity=".85"/>
-        <rect x="-150" y="-9" width="150" height="18" rx="9" fill="#3fb6a8" opacity=".35"/><rect x="0" y="-9" width="150" height="18" rx="9" fill="#ff7a59" opacity=".35"/>
-        <text x="-160" y="6" text-anchor="end" font-family="Fredoka, sans-serif" font-weight="600" font-size="17" fill="#2c8a7f">Nala</text>
-        <text x="160" y="6" font-family="Fredoka, sans-serif" font-weight="600" font-size="17" fill="#d65a35">Poppy</text>
-        <circle id="tugknot" cx="0" cy="0" r="12" fill="#fff" stroke="#e2483a" stroke-width="5"/>
-      </g>
       <g id="fxLayer"></g>`;
     const nala = makeDog('nala', 290, 372, .82, 1), poppy = makeDog('poppy', 510, 372, .82, -1);
     nala.pose = poppy.pose = 'tug';
@@ -626,20 +620,19 @@
         }
       }
       // the sock stretches between their mouths, and they slide with it
-      const c = 400 + clamp(S.p, -1, 1)*70;
+      const c = 400 + clamp(S.p, -1, 1)*105;
       if (S.state !== 'end'){ nala.x = c - 112; poppy.x = c + 112; }
       const mN = mouth(nala), mP = mouth(poppy);
       const wob = Math.sin(tt*20)*3;
-      if (S.state === 'end'){ $('sock').setAttribute('d', ''); $('sockStripe').setAttribute('d', ''); }
-      else {
-        const holder = S.state === 'won' ? (S.p >= 1 ? mP : mN) : null;
+      {
+        // the winner keeps the sock, dangling from her mouth, to the very end
+        const holder = S.state !== 'tug' ? (S.p >= 1 ? mP : mN) : null;
         const a = holder || mN, b = holder ? {x: holder.x + (S.p >= 1 ? -30 : 30), y: holder.y + 26} : mP;
         const d = `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${((a.x + b.x)/2).toFixed(1)} ${((a.y + b.y)/2 + 10 + wob).toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
         $('sock').setAttribute('d', d); $('sockStripe').setAttribute('d', d);
       }
       $('glow').setAttribute('transform', `translate(${poppy.x + 10},${poppy.gy - 80})`);
-      $('tugknot').setAttribute('cx', (clamp(S.p, -1, 1)*140).toFixed(1));
-      $('tugbar').setAttribute('opacity', S.state === 'end' ? 0 : 1);
+
     };
     return S;
   }
