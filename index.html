@@ -48,12 +48,13 @@
   #screen:before,#screen:after{content:""; position:absolute; left:0; right:0; height:5.5%; background:#000; z-index:4; pointer-events:none;}
   #screen:before{top:0;} #screen:after{bottom:0;}
   #scene{display:block; width:100%; height:auto; touch-action:none; cursor:pointer;}
-  #fade{position:absolute; inset:0; background:#000; opacity:1; transition:opacity 1.1s ease; pointer-events:none; z-index:5;}
+  #fade{position:absolute; inset:0; background:#000; opacity:1; transition:opacity 1.7s ease; pointer-events:none; z-index:5;}
   #chapter{position:absolute; inset:0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
     background:#000; opacity:0; pointer-events:none; transition:opacity .9s ease; padding:0 6%;}
   #chapter.on{opacity:1; pointer-events:auto;}
   #chapter .num{font-family:'Nunito',sans-serif; font-weight:700; letter-spacing:.3em; text-transform:uppercase; font-size:clamp(11px,2.4vw,15px); color:#b9a9d6;}
   #chapter .ttl{font-family:'Fredoka',sans-serif; font-weight:600; font-size:clamp(28px,7vw,54px); margin:6px 0 4px; color:#fff6e6;}
+  #chapter .line{font-family:'Nunito',sans-serif; font-style:italic; font-size:clamp(14px,3.4vw,19px); color:#d9d0e8; margin:14px 0 0; max-width:30em;}
   #chapter .act{font-family:'Fredoka',sans-serif; font-weight:500; font-size:clamp(15px,3.6vw,22px); color:#ffb38a;}
   #chapter .tap{position:absolute; bottom:9%; font-size:12px; color:#6f6585; letter-spacing:.08em;}
   #words{position:absolute; left:0; right:0; top:14%; z-index:3; text-align:center; pointer-events:none;
@@ -167,7 +168,7 @@
     <svg id="scene" viewBox="0 0 800 420" aria-label="Nala's film"></svg>
     <div id="words"></div>
     <div id="fade"></div>
-    <div id="chapter"><div class="num" id="chNum"></div><div class="ttl" id="chTtl"></div><div class="act" id="chAct"></div><div class="tap">tap to continue</div></div>
+    <div id="chapter"><div class="num" id="chNum"></div><div class="ttl" id="chTtl"></div><div class="act" id="chAct"></div><div class="line" id="chLine"></div><div class="tap">tap to continue</div></div>
   </div>
   <div id="sub"></div>
   <div id="bar">
@@ -282,17 +283,42 @@
 
 
   // ---------- music: each sister has her own little tune ----------
-  const POPPY = [72, 76, 79, 81, 79];       // C E G A G
-  const NALA  = [76, 79, 84, 83, 84];       // E G C B C, a third above
+  const POPPY = [72, 76, 79, 81, 79];       // (kept for small cues)
+  const NALA  = [76, 79, 84, 83, 84];
+  // ONE song. Nala holds the first half, Poppy the second. Only together is it whole.
+  const HALF_A = [76, 79, 81, 79, 76, 74];          // E G A G E D   (Nala)
+  const HALF_B = [77, 76, 74, 72, 74, 72];          // F E D C D C   (Poppy)
+  const STEP = .46;
+  // play notes as a gentle music-box line; returns its length in seconds
+  function melody(notes, when, opts){
+    const o = Object.assign({step: STEP, vol: .07, type: 'sine', shift: 0, cut: notes.length, last: 1.9}, opts || {});
+    notes.slice(0, o.cut).forEach((n, i) => {
+      const d = i === o.cut - 1 ? o.last : o.step*1.7;
+      tone(N(n + o.shift), d, o.type, when + i*o.step, o.vol);
+      tone(N(n + o.shift + 12), d*.6, 'sine', when + i*o.step, o.vol*.25);
+    });
+    return o.cut*o.step;
+  }
+  // the whole song, with chords underneath: lullaby (soft) or full (the reunion)
+  function song(when, opts){
+    const o = Object.assign({vol: .07, chords: .05, shift: 0}, opts || {});
+    const L = HALF_A.length*STEP;
+    melody(HALF_A, when, {vol: o.vol, shift: o.shift, last: STEP*1.7});
+    melody(HALF_B, when + L, {vol: o.vol, shift: o.shift, last: 2.6});
+    const c = (ns, t, d) => setTimeout(() => chord(ns.map(n => N(n + o.shift)), {dur: d, vol: o.chords, attack: .25, cutoff: 1800}), t*1000);
+    c([48, 55, 64], when, L*.5 + .3); c([45, 52, 60], when + L*.5, L*.5 + .3);
+    c([41, 53, 57, 60], when + L, L*.5 + .3); c([43, 55, 59, 62], when + L*1.5, L*.5);
+    c([48, 55, 60, 64], when + L*2, 3.2);
+    return L*2 + 2;
+  }
   function tune(notes, when, step, vol, type, shift){
     notes.forEach((n, i) => tone(N(n + (shift || 0)), step*1.8, type || 'triangle', (when || 0) + i*step, vol || .08));
   }
   function pad(notes, opts){ chord(notes.map(N), Object.assign({dur: 7, vol: .07, attack: 1.4, cutoff: 1600}, opts || {})); }
   Object.assign(SFX, {
-    growl(){ noise(.16, 0, .16, 220, 140, 4); tone(95, .16, 'sawtooth', 0, .04, 80); },
+    pluck(n){ tone(N(n), .5, 'triangle', 0, .06); tone(N(n + 12), .25, 'sine', 0, .02); },
     yip(){ tone(900, .09, 'triangle', 0, .14, 1250); },
-    door(){ tone(110, .2, 'sine', 0, .35, 50); noise(.12, 0, .3, 400, 150, 1.4); },
-    engine(){ tone(48, 3.2, 'sawtooth', .2, .03, 70); tone(52, 3.2, 'sawtooth', .2, .02, 30); },
+    softWoof(){ tone(420, .12, 'triangle', 0, .1, 330); tone(450, .12, 'triangle', .16, .09, 350); },
     sniff(){ for (let i = 0; i < 3; i++) noise(.06, i*.11, .14, 2600, 1900, 2); },
     heart(){ tone(70, .12, 'sine', 0, .25, 50); tone(70, .12, 'sine', .16, .18, 50); },
     sparkle(){ [N(88), N(91), N(95)].forEach((f, i) => tone(f, .4, 'sine', i*.07, .05)); }
@@ -314,6 +340,18 @@
     o.connect(gn); o2.connect(g2); g2.connect(gn); out.connect(master);
     o.start(t0); o2.start(t0); lfo.start(t0);
     return {a, o, o2, lfo, gn, base};
+  }
+  function howlSing(notes, vol, pan, shift){
+    const h = howlStart(N(notes[0] + (shift || 0) - 12), vol, pan); if (!h) return 0;
+    const t0 = h.a.currentTime + .45;
+    notes.forEach((n, i) => {
+      const f = N(n + (shift || 0) - 12);
+      h.o.frequency.setTargetAtTime(f, t0 + i*STEP*1.2, .06);
+      h.o2.frequency.setTargetAtTime(f*1.5, t0 + i*STEP*1.2, .06);
+    });
+    const len = .45 + notes.length*STEP*1.2;
+    setTimeout(() => howlStop(h), len*1000);
+    return len;
   }
   function howlStop(h){
     if (!h) return; const t = h.a.currentTime + .01;
@@ -476,7 +514,7 @@
     S.up = () => { S.holding = false; };
     S.update = (dt) => {
       S.t += dt;
-      if ((S.pad -= dt) <= 0){ S.pad = 6.5; pad([53, 57, 60, 64, 69], {vol: .06}); }
+      if (S.phase === 'wake' && (S.pad -= dt) <= 0){ S.pad = 6.5; pad([53, 57, 60, 64, 69], {vol: .05}); }
       const ph = (S.t / PER)*Math.PI*2;
       poppy.breath = Math.sin(ph);
       if (S.holding && S.close < 1){ S.close = Math.min(1, S.close + dt*.55); nala.x = lerp(236, 352, S.close); nala.moving = S.close < 1; }
@@ -485,9 +523,9 @@
         S.phase = 'sync'; S.syncT = 0; sub('');
         words('Poppy breathes in. Nala breathes in.', 3600);
         after(4, () => words('Poppy breathes out. So does Nala.', 3600));
-        after(8, () => { words('Two hearts, one beat.', 4200); tune(POPPY, 0, .34, .07, 'sine'); tune(NALA, 0, .34, .06, 'sine'); heartAt(410, 250, 5); });
-        after(13, () => S.next = true);
-        tune(POPPY, .6, .34, .05, 'sine');
+        after(8, () => { words('Two hearts, one beat.', 4800); heartAt(410, 250, 5); });
+        after(14, () => S.next = true);
+        song(.6, {vol: .05, chords: .035, shift: 12});
       }
       // Nala's breath slowly falls into step with Poppy's
       if (S.phase === 'sync'){ S.syncT += dt; S.sync = Math.min(1, S.syncT/8); }
@@ -537,24 +575,32 @@
       <path id="sock" d="" stroke="#ffffff" stroke-width="13" fill="none" stroke-linecap="round"/>
       <path id="sockStripe" d="" stroke="#e2483a" stroke-width="13" fill="none" stroke-dasharray="9 16"/>
       <g id="glow" opacity="0"><circle r="60" fill="#ffe27a" opacity=".35"/><text y="-50" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="30" fill="#ff9a2e">!</text></g>
-      <text id="score" x="400" y="62" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="600" font-size="22" fill="#3f3a4a" opacity=".75"></text>
+      <g id="tugbar" transform="translate(400,62)">
+        <rect x="-150" y="-9" width="300" height="18" rx="9" fill="#fff" opacity=".85"/>
+        <rect x="-150" y="-9" width="150" height="18" rx="9" fill="#3fb6a8" opacity=".35"/><rect x="0" y="-9" width="150" height="18" rx="9" fill="#ff7a59" opacity=".35"/>
+        <text x="-160" y="6" text-anchor="end" font-family="Fredoka, sans-serif" font-weight="600" font-size="17" fill="#2c8a7f">Nala</text>
+        <text x="160" y="6" font-family="Fredoka, sans-serif" font-weight="600" font-size="17" fill="#d65a35">Poppy</text>
+        <circle id="tugknot" cx="0" cy="0" r="12" fill="#fff" stroke="#e2483a" stroke-width="5"/>
+      </g>
       <g id="fxLayer"></g>`;
     const nala = makeDog('nala', 290, 372, .82, 1), poppy = makeDog('poppy', 510, 372, .82, -1);
     nala.pose = poppy.pose = 'tug';
     bindDog(nala); bindDog(poppy);
     const S = {dogs: [nala, poppy], t: 0, p: 0, round: 1, rounds: 1, state: 'tug', pause: 0, taps: 0, idle: 0, said: false};
-    sub('<b>Tap</b> to tug.');
+    sub('<b>Tap, tap, tap</b> to pull the sock to Nala. Or stop, and let Poppy win.');
+    const TUNE = HALF_A.concat(HALF_B);
+    pad([60, 64, 67, 72], {vol: .04, dur: 9, attack: 1});
     S.down = () => {
       if (S.state !== 'tug') return;
-      S.p -= .1; S.taps++; S.idle = 0; if (S.taps % 2) SFX.growl();
+      S.p -= .1; SFX.pluck(TUNE[S.taps % TUNE.length]); S.taps++; S.idle = 0;
     };
     const roundEnd = (winner) => {
       S.state = 'won'; S.pause = 2.8;
       if (winner === 'poppy'){
-        R.poppyWins++; poppy.pose = 'stand'; poppy.hop = 1; poppy.tailSpeed = 30; SFX.yip(); setTimeout(SFX.woof, 300); tune(POPPY, .2, .16, .07);
+        R.poppyWins++; poppy.pose = 'stand'; poppy.hop = 1; poppy.tailSpeed = 30; SFX.yip(); chord([N(60), N(64), N(67), N(72)], {dur: 2.4, vol: .1, strum: .05, cutoff: 2600});
         $('glow').setAttribute('opacity', 1); heartAt(poppy.x, 240, 2, '✨');
       } else {
-        R.nalaWins++; nala.pose = 'stand'; nala.hop = 1; nala.tailSpeed = 30; SFX.woof(); tune(NALA, .2, .16, .07);
+        R.nalaWins++; nala.pose = 'stand'; nala.hop = 1; nala.tailSpeed = 30; SFX.yip(); chord([N(60), N(64), N(67), N(72)], {dur: 2.4, vol: .1, strum: .05, cutoff: 2600});
       }
     };
     S.update = (dt) => {
@@ -562,7 +608,7 @@
       if (S.state === 'tug'){
         S.idle += dt;
         S.p += dt*(S.taps ? .3 : .06);      // Poppy pulls, all the time (gently, until you start)
-        if (!S.said && S.t > 3.5){ S.said = true; sub('<b>Keep tapping</b> to win… or <b>stop</b>, and let Poppy win.'); }
+        if (!S.said && S.taps > 3){ S.said = true; sub('<b>Keep tapping</b> to win… or <b>stop</b>, and let Poppy win.'); }
         if (S.p <= -1) roundEnd('nala');
         else if (S.p >= 1) roundEnd('poppy');
       } else if (S.state === 'won'){
@@ -592,7 +638,8 @@
         $('sock').setAttribute('d', d); $('sockStripe').setAttribute('d', d);
       }
       $('glow').setAttribute('transform', `translate(${poppy.x + 10},${poppy.gy - 80})`);
-      $('score').textContent = '';
+      $('tugknot').setAttribute('cx', (clamp(S.p, -1, 1)*140).toFixed(1));
+      $('tugbar').setAttribute('opacity', S.state === 'end' ? 0 : 1);
     };
     return S;
   }
@@ -640,9 +687,10 @@
         if (S.light >= 1){
           S.state = 'lit'; sub(''); words('As far as the light goes.', 4200);
           chord([N(48),N(55),N(64),N(67),N(72),N(76)], {dur: 4.5, vol: .16, strum: .06, cutoff: 3000}); SFX.sparkle();
-          after(4.6, () => {
-            SFX.door(); SFX.engine(); poppy.pose = 'stand'; poppy.dir = -1; poppy.tailSpeed = 6;
-            after(1.6, () => { S.state = 'give'; S.giveT = 0; sub('Poppy has to go. <b>Tap the lion</b> to give it to her. Or don\'t.'); $('lionToy').classList.add('twinkle'); });
+          after(4.8, () => {
+            poppy.pose = 'stand'; poppy.dir = -1; poppy.tailSpeed = 4;
+            words('Someone is calling Poppy. Her new family is here.', 4000);
+            after(4.2, () => { S.state = 'give'; S.giveT = 0; sub('Poppy has to go. <b>Tap the lion</b> to give it to her. Or don\'t.'); $('lionToy').classList.add('twinkle'); });
           });
         }
       }
@@ -661,14 +709,15 @@
     function give(gave){
       S.state = 'leaving'; R.gave = gave; sub('');
       $('lionToy').classList.remove('twinkle');
-      if (gave){ $('lionToy').style.display = 'none'; poppy.el.held.style.display = ''; SFX.sparkle(); tune(NALA, 0, .3, .06, 'sine'); }
-      else { nala.pose = 'lie'; lion.x = nala.x + 46; lion.y = nala.gy - 4; }
-      after(1.4, () => {
-        // down from the rock, and away
-        poppy.hop = 1; poppy.jump = {from: poppy.gy, to: 372, k: 0};
-      });
-      after(5.6, () => { SFX.whine(); nala.pose = gave ? 'sad' : 'lie'; words(gave ? 'She took the lion with her.' : 'Nala kept the lion. It smelled of Poppy.', 4400); });
-      after(10.5, () => S.next = true);
+      if (gave){ $('lionToy').style.display = 'none'; poppy.el.held.style.display = ''; SFX.sparkle(); }
+      else { lion.x = nala.x + 46; lion.y = nala.gy - 4; }
+      // the song starts… and breaks off in the middle
+      melody(HALF_A, .3, {vol: .07, last: STEP*1.7});
+      melody(HALF_B, .3 + HALF_A.length*STEP, {vol: .07, cut: 2, last: 1.2});
+      chord([N(48), N(55), N(64)], {dur: HALF_A.length*STEP + 1, vol: .04, attack: .4, cutoff: 1600});
+      after(1.4, () => { poppy.hop = 1; poppy.jump = {from: poppy.gy, to: 372, k: 0}; });
+      // the look back
+      S.lookBack = true;
     }
     S.update = (dt) => {
       S.t += dt;
@@ -692,8 +741,20 @@
         poppy.gy = lerp(j.from, j.to, j.k); poppy.x -= dt*60;
         if (j.k >= 1){ poppy.jump = null; poppy.leaving = true; poppy.moving = true; }
       }
-      if (poppy.leaving){ poppy.x -= dt*110; if (poppy.x < -120) poppy.leaving = false; }
-      if (!lion.drag && S.state !== 'leaving' && S.state !== 'give'){ /* stays by Nala */ }
+      if (poppy.leaving){
+        poppy.x -= dt*(S.looked ? 120 : 70);
+        if (S.lookBack && !S.looked && poppy.x < 150){
+          S.looked = true; poppy.leaving = false; poppy.moving = false; poppy.dir = 1; poppy.pose = 'look';
+          nala.pose = 'stand'; S.step = 0;
+          after(2.6, () => { poppy.dir = -1; poppy.pose = 'stand'; poppy.leaving = true; poppy.moving = true; });
+          after(6.2, () => { nala.pose = R.gave ? 'sad' : 'lie'; words(R.gave ? 'She took the lion with her.' : 'Nala kept the lion. It smelled of Poppy.', 4600); });
+          after(11.5, () => S.next = true);
+        }
+        if (poppy.x < -120) poppy.leaving = false;
+      }
+      // Nala takes one step after her, and stops at the edge
+      if (S.step != null && S.step < 1){ S.step = Math.min(1, S.step + dt*1.4); nala.x = lerp(300, 322, S.step); nala.moving = S.step < 1; if (S.step >= 1) nala.moving = false; }
+      if (!R.gave && S.looked && nala.pose === 'lie'){ lion.x = nala.x + 46; lion.y = nala.gy - 4; }
       placeLion();
       $('lionToy').setAttribute('opacity', S.state === 'look' ? (.3 + .7*L).toFixed(2) : 1);
     };
@@ -704,66 +765,87 @@
   // FOUR · Night — Call
   // =====================================================================
   function sceneNight(){
-    const arc = Array.from({length: 9}, (_, i) => { const u = (i + 1)/10; return {x: lerp(170, 640, u), y: 210 - Math.sin(Math.PI*u)*130}; });
+    const arc = Array.from({length: 9}, (_, i) => { const u = (i + 1)/10; return {x: lerp(190, 640, u), y: 200 - Math.sin(Math.PI*u)*120}; });
     scene.innerHTML = `
       <defs><linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1030"/><stop offset="1" stop-color="#26244f"/></linearGradient></defs>
-      <rect width="800" height="420" fill="url(#nsky)"/>
-      <g fill="#fff">${Array.from({length: 46}, (_, i) => `<circle class="twinkle" style="animation-delay:${(i%7)*.4}s" cx="${(i*97 + 31)%800}" cy="${10 + (i*61)%230}" r="${.8 + (i%4)*.4}" opacity=".6"/>`).join('')}</g>
-      <circle cx="405" cy="66" r="30" fill="#fff4cf"/><circle cx="405" cy="66" r="52" fill="#fff4cf" opacity=".12"/>
-      <g id="bridge">${arc.map((p, i) => `<circle id="br${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4" fill="#ffe9a8" opacity=".12"/>`).join('')}</g>
-      <path d="M0 300 Q 140 270 300 296 Q 460 266 620 292 Q 720 276 800 290 L800 420 L0 420 Z" fill="#141a2a"/>
-      <!-- Nala's house, close -->
-      <path d="M20 400 V 250 L 150 170 L 280 250 V 400 Z" fill="#2a2440"/>
-      <rect x="92" y="236" width="118" height="100" rx="6" fill="#ffd98a"/>
-      <g id="dogs">${dogSVG('nala')}</g>
-      <path d="M92 300 h118" stroke="#2a2440" stroke-width="5"/>
-      <rect x="86" y="230" width="130" height="112" rx="8" fill="none" stroke="#2a2440" stroke-width="10"/>
-      <!-- Poppy's house, far away -->
-      <path d="M650 330 V 270 L 700 238 L 750 270 V 330 Z" fill="#221d36"/>
-      <rect x="682" y="266" width="36" height="32" rx="3" fill="#ffd98a"/>
-      <g id="farPoppy">${dogSVG('poppy')}</g>
-      <rect x="679" y="263" width="42" height="38" rx="4" fill="none" stroke="#221d36" stroke-width="5"/>
+      <g id="outside">
+        <rect width="800" height="420" fill="url(#nsky)"/>
+        <g fill="#fff">${Array.from({length: 46}, (_, i) => `<circle class="twinkle" style="animation-delay:${(i%7)*.4}s" cx="${(i*97 + 31)%800}" cy="${10 + (i*61)%230}" r="${.8 + (i%4)*.4}" opacity=".6"/>`).join('')}</g>
+        <circle cx="405" cy="60" r="30" fill="#fff4cf"/><circle cx="405" cy="60" r="52" fill="#fff4cf" opacity=".12"/>
+        <g id="bridge">${arc.map((p, i) => `<circle id="br${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4" fill="#ffe9a8" opacity=".12"/>`).join('')}</g>
+        <path d="M0 300 Q 140 270 300 296 Q 460 266 620 292 Q 720 276 800 290 L800 420 L0 420 Z" fill="#141a2a"/>
+        <path d="M10 400 V 230 L 150 140 L 290 230 V 400 Z" fill="#2a2440"/>
+        <rect x="66" y="196" width="168" height="140" rx="8" fill="#ffd98a"/>
+        <g id="slotWin"></g>
+        <rect x="60" y="190" width="180" height="152" rx="10" fill="none" stroke="#2a2440" stroke-width="12"/>
+        <rect x="56" y="336" width="188" height="12" rx="4" fill="#3a3352"/>
+        <path d="M650 330 V 270 L 700 238 L 750 270 V 330 Z" fill="#221d36"/>
+        <rect x="682" y="266" width="36" height="32" rx="3" fill="#ffd98a"/>
+        <g id="farPoppy">${dogSVG('poppy')}</g>
+        <rect x="679" y="263" width="42" height="38" rx="4" fill="none" stroke="#221d36" stroke-width="5"/>
+      </g>
+      <g id="inside" style="transition:opacity 1.6s ease">
+        <rect width="800" height="420" fill="#2e2638"/>
+        <rect x="0" y="292" width="800" height="128" fill="#4a3530"/>
+        <rect x="560" y="70" width="120" height="110" rx="6" fill="#141838" stroke="#5a4a66" stroke-width="7"/><circle cx="640" cy="100" r="12" fill="#fff4cf"/>
+        <ellipse cx="400" cy="330" rx="250" ry="54" fill="#8a6a8a"/>
+        <ellipse cx="400" cy="326" rx="228" ry="40" fill="#cdb6d0"/>
+        <g id="slotIn"></g>
+        <path d="M150 330 Q 150 396 400 400 Q 650 396 650 330 Q 620 372 400 374 Q 180 372 150 330 Z" fill="#6f5272"/>
+      </g>
       <g id="fxLayer"></g>`;
-    const nala = makeDog('nala', 150, 300, .62, 1), poppy = makeDog('poppy', 700, 296, .22, -1);
-    nala.pose = poppy.pose = 'sit';
+    // Nala lives in one place in the picture, then moves to the window
+    const holder = document.createElementNS(NS, 'g'); holder.innerHTML = dogSVG('nala'); $('slotIn').appendChild(holder.firstElementChild);
+    const nala = makeDog('nala', 250, 342, .7, 1), poppy = makeDog('poppy', 700, 296, .22, -1);
+    nala.pose = 'sleep'; poppy.pose = 'sit';
     bindDog(nala); bindDog(poppy);
-    const S = {dogs: [nala, poppy], t: 0, state: 'wait', calls: 0, held: 0, h: null, lit: 0};
-    sub('Night. Different houses. <b>Tap</b> to howl, then listen.');
+    const S = {dogs: [nala, poppy], t: 0, state: 'inside', calls: 0, h: null, lit: 0};
+    sub('');
+    after(1.2, () => words('A new home. A big new basket.', 3600));
+    after(5.2, () => words('Too big.', 3200));
+    after(9.2, () => {
+      $('inside').style.opacity = 0;
+      $('slotWin').appendChild(nala.el.g);
+      nala.x = 150; nala.gy = 330; nala.s = .55; nala.pose = 'sit';
+      after(1.8, () => { S.state = 'wait'; sub('Night. <b>Tap</b>, and Nala sings to the moon. Then listen.'); });
+    });
     S.down = () => {
       if (S.state !== 'wait') return;
-      S.state = 'howl'; S.held = 0; nala.pose = 'howl';
-      S.h = howlStart(560, .2, -.35);
-    };
-    S.tapUp = () => {};
-    S.up = (p) => {
-      if (S.state !== 'howl' || (p !== undefined && S.held < 1.7)) return;
-      howlStop(S.h); S.h = null; nala.pose = 'sit';
-      const len = clamp(S.held, .6, 3);
-      S.calls++; S.state = 'listen';
-      const n = S.calls, vol = [.05, .1, .17][n - 1] || .17;
-      after(1.3, () => {
-        poppy.pose = 'howl';
-        const h = howlStart(470, vol, .45);
-        after(len, () => { howlStop(h); poppy.pose = 'sit';
-          // the stars between them light up
-          const from = (n - 1)*3, to = n*3;
-          for (let i = from; i < to; i++) setTimeout(() => { const s = $('br' + i); if (s){ s.setAttribute('opacity', 1); s.setAttribute('r', 4.6); } SFX.sparkle(); }, (i - from)*260);
-          if (n === 1) sub('Far away, someone answers. <b>Again?</b>');
-          else if (n === 2) sub('Clearer this time. <b>Once more.</b>');
-          if (n >= 3){
-            S.state = 'done'; R.calls = n; sub('');
-            after(1.2, () => { words('Same moon. Same stars.', 4600); pad([57, 60, 64, 67, 71], {vol: .08, dur: 6}); tune(NALA, .6, .4, .05, 'sine'); tune(POPPY, 1.6, .4, .04, 'sine', -12); });
-            after(6.5, () => S.next = true);
-          } else S.state = 'wait';
+      S.state = 'howl'; nala.pose = 'howl'; sub('');
+      const len = howlSing(HALF_A, .16, -.35);
+      S.calls++;
+      const n = S.calls;
+      after(len + .3, () => {
+        nala.pose = 'sit';
+        if (n === 1){
+          // nothing. only the moon.
+          after(3.2, () => { words('No answer. Only the moon.', 3600); });
+          after(7, () => { S.state = 'wait'; sub('<b>Tap</b> to sing again.'); });
+          return;
+        }
+        after(1.4, () => {
+          poppy.pose = 'howl';
+          const l2 = howlSing(HALF_B, n === 2 ? .035 : .15, .45);
+          after(l2 + .2, () => {
+            poppy.pose = 'sit';
+            const from = n === 2 ? 0 : 4, to = n === 2 ? 4 : 9;
+            for (let i = from; i < to; i++) setTimeout(() => { const st = $('br' + i); if (st){ st.setAttribute('opacity', 1); st.setAttribute('r', 4.6); } SFX.sparkle(); }, (i - from)*280);
+            if (n === 2){ after(1.4, () => { words('Far away, very faint… the other half of the song.', 4200); }); after(5.6, () => { S.state = 'wait'; sub('<b>Tap</b> to sing once more.'); }); }
+            else {
+              S.state = 'done'; R.calls = n;
+              after(1.6, () => { words('Same moon. Same stars. Same song.', 5200); chord([N(48), N(55), N(64), N(67), N(72)], {dur: 5, vol: .12, strum: .07, cutoff: 2600}); });
+              after(8, () => S.next = true);
+            }
+          });
         });
       });
     };
     S.update = (dt) => {
       S.t += dt;
-      if (S.state === 'howl'){ S.held += dt; if (S.held > 1.7) S.up(); }
-      if ((S.lit -= dt) <= 0){ S.lit = 8; pad([45, 52, 57, 60, 64], {vol: .045, dur: 8, attack: 2}); }
+      if (S.state === 'inside') nala.breath = Math.sin(S.t*1.6);
+      if ((S.lit -= dt) <= 0){ S.lit = 9; pad([45, 52, 57, 60, 64], {vol: .035, dur: 9, attack: 2.5}); }
     };
-    S.cleanup = () => { if (S.h) howlStop(S.h); };
+    S.cleanup = () => {};
     return S;
   }
 
@@ -801,17 +883,20 @@
     const meet = () => {
       S.state = 'meet'; sub(''); nala.moving = false; nala.pose = 'look';
       poppy.el.g.style.display = ''; poppy.pose = 'stand';
-      SFX.woof(); tune(POPPY, .3, .26, .08);
       after(1.6, () => { poppy.jumpDown = {k: 0}; });
-      after(3.0, () => { tune(NALA, 0, .26, .08); nala.hop = 1; SFX.yip(); });
-      after(3.6, () => { S.run = true; nala.moving = poppy.moving = true; });
+      // they walk up slowly… stop… sniff… and then they know
+      after(3.2, () => { S.walk = true; nala.moving = poppy.moving = true; });
+      after(5.6, () => { S.walk = false; nala.moving = poppy.moving = false; nala.pose = poppy.pose = 'sniff'; SFX.sniff(); setTimeout(SFX.sniff, 900); words('…', 2000); });
+      after(8.0, () => { nala.pose = poppy.pose = 'look'; });
+      after(9.0, () => { nala.hop = 1; poppy.hop = 1; SFX.yip(); setTimeout(SFX.softWoof, 250); nala.tailSpeed = poppy.tailSpeed = 32; words('It\'s her.', 2400); });
+      after(9.6, () => { S.run = true; nala.moving = poppy.moving = true; });
     };
     const together = () => {
       S.state = 'together'; nala.moving = poppy.moving = false;
       nala.pose = poppy.pose = 'bow'; nala.tailSpeed = poppy.tailSpeed = 30;
-      // both tunes at once, a third apart, then one chord
-      tune(POPPY, 0, .3, .08, 'triangle'); tune(NALA, 0, .3, .07, 'triangle');
-      setTimeout(() => chord([N(48), N(55), N(64), N(67), N(71), N(76)], {dur: 5, vol: .2, strum: .05, cutoff: 3200}), 1500);
+      // the whole song, at last
+      const L = song(.2, {vol: .09, chords: .07});
+      setTimeout(() => chord([N(48), N(55), N(64), N(67), N(72), N(76)], {dur: 6, vol: .2, strum: .07, cutoff: 3200}), (L - 1.6)*1000);
       heartAt((nala.x + poppy.x)/2, 280, 6);
       after(1.8, () => {
         // the lion comes back between them
@@ -822,12 +907,15 @@
         SFX.sparkle();
         words(R.gave ? 'She brought the lion back.' : 'Nala gives her the lion.', 4000);
       });
-      after(5.6, () => { nala.pose = poppy.pose = 'sit'; nala.dir = 1; poppy.dir = 1; nala.tailSpeed = poppy.tailSpeed = 8; heartAt((nala.x + poppy.x)/2, 270, 3); });
-      after(9.5, () => S.end = true);
+      // nose to tail, like in the basket
+      after(6.8, () => { nala.pose = poppy.pose = 'sleep'; nala.tailSpeed = poppy.tailSpeed = 4; S.breathe = true; nala.x += 10; poppy.x -= 10; });
+      after(8.0, () => words('Poppy breathes in. Nala breathes in.', 4200));
+      after(12.4, () => { words('Sisters.', 3800); heartAt((nala.x + poppy.x)/2, 300, 3); });
+      after(17, () => S.end = true);
     };
     S.update = (dt) => {
       S.t += dt;
-      if ((S.pad -= dt) <= 0){ S.pad = 7; pad([48, 55, 60, 64, 69], {vol: .05, dur: 7.5, attack: 2}); }
+      if (S.state === 'trail' && (S.pad -= dt) <= 0){ S.pad = 7; pad([48, 55, 60, 64, 69], {vol: .045, dur: 7.5, attack: 2}); }
       // a butterfly drifts about
       const fx = 300 + Math.sin(S.t*.5)*120, fy = 250 + Math.sin(S.t*1.3)*30;
       $('fly').setAttribute('transform', `translate(${fx.toFixed(1)},${fy.toFixed(1)}) scale(${(.6 + .4*Math.abs(Math.sin(S.t*12))).toFixed(2)},1)`);
@@ -848,7 +936,7 @@
           const o = dd < -20 ? .08 : dd < 140 ? .9 - dd/200 : .18;
           $('tr' + i).setAttribute('opacity', o.toFixed(2));
         });
-        if (nala.x >= 500) meet();
+        if (nala.x >= 440) meet();
       } else {
         $('finger').style.display = 'none';
         dots.forEach((p, i) => $('tr' + i).setAttribute('opacity', '.06'));
@@ -858,10 +946,16 @@
         poppy.x = lerp(700, 688, j.k); poppy.gy = lerp(292, 372, j.k) - Math.sin(Math.PI*j.k)*40;
         if (j.k >= 1) poppy.jumpDown = null;
       }
+      if (S.walk){
+        nala.pose = poppy.pose = 'stand';
+        nala.x = Math.min(nala.x + dt*22, 500); nala.gy += (372 - nala.gy)*Math.min(1, dt*4);
+        if (!poppy.jumpDown) poppy.x = Math.max(poppy.x - dt*16, 680);
+      }
+      if (S.breathe){ const b = Math.sin(S.t*1.7); nala.breath = b; poppy.breath = b; }
       if (S.run && S.state === 'meet'){
         nala.pose = poppy.pose = 'stand';
-        nala.x = Math.min(nala.x + dt*120, 526); nala.gy += (372 - nala.gy)*Math.min(1, dt*4);
-        if (!poppy.jumpDown) poppy.x = Math.max(poppy.x - dt*120, 668);
+        nala.x = Math.min(nala.x + dt*90, 526); nala.gy += (372 - nala.gy)*Math.min(1, dt*4);
+        if (!poppy.jumpDown) poppy.x = Math.max(poppy.x - dt*90, 668);
         if (nala.x >= 526 && poppy.x <= 668 && !poppy.jumpDown) together();
       }
       if (S.end && !S.ended){ S.ended = true; S.next = true; }
@@ -873,19 +967,19 @@
   // the film
   // =====================================================================
   const CHAPTERS = [
-    {num: 'One', ttl: 'The basket', act: 'Snuggle', make: sceneBasket},
-    {num: 'Two', ttl: 'The sock', act: 'Play', make: sceneSock},
-    {num: 'Three', ttl: 'The rock at sunrise', act: 'Look · Give', make: sceneRock},
-    {num: 'Four', ttl: 'Night', act: 'Call', make: sceneNight},
-    {num: 'Five', ttl: 'The park at sunset', act: 'Sniff', make: sceneParks}
+    {num: 'One', ttl: 'The basket', act: 'Snuggle', line: 'They were born on the same night, in the same basket.', make: sceneBasket},
+    {num: 'Two', ttl: 'The sock', act: 'Play', line: 'Every day, the same old sock.', make: sceneSock},
+    {num: 'Three', ttl: 'The rock at sunrise', act: 'Look · Give', line: 'Then came the last morning.', make: sceneRock},
+    {num: 'Four', ttl: 'Night', act: 'Call', line: 'Different houses now.', make: sceneNight},
+    {num: 'Five', ttl: 'The park at sunset', act: 'Sniff', line: 'Weeks later.', make: sceneParks}
   ];
   let S = null, idx = -1, chapterOn = false, chapterT = 0, raf = 0, last = 0, ending = false;
   function chapter(i){
     idx = i; const c = CHAPTERS[i];
-    $('chNum').textContent = 'Chapter ' + c.num; $('chTtl').textContent = c.ttl; $('chAct').textContent = c.act;
+    $('chNum').textContent = 'Chapter ' + c.num; $('chTtl').textContent = c.ttl; $('chAct').textContent = c.act; $('chLine').textContent = c.line;
     $('chapter').classList.add('on'); chapterOn = true; chapterT = 0;
     sub(''); wordsOff();
-    tune(i % 2 ? POPPY : NALA, .3, .38, .05, 'sine', i === 3 ? -3 : 0);
+    pad([[53, 57, 60, 64], [60, 64, 67, 72], [57, 60, 64, 67], [45, 52, 57, 60], [48, 55, 60, 64]][i], {vol: .04, dur: 5, attack: 1.2});
   }
   function startScene(){
     $('chapter').classList.remove('on'); chapterOn = false;
@@ -899,7 +993,7 @@
     setTimeout(() => {
       if (idx + 1 < CHAPTERS.length) chapter(idx + 1);
       else finish();
-    }, 1200);
+    }, 1900);
   }
   function finish(){
     ending = true; S = null;
@@ -917,7 +1011,7 @@
     const dt = Math.min(.05, last ? (ts - last)/1000 : 0); last = ts;
     if (document.hidden) return;
     tt += dt;
-    if (chapterOn){ chapterT += dt; if (chapterT > 3.4) startScene(); return; }
+    if (chapterOn){ chapterT += dt; if (chapterT > 5) startScene(); return; }
     for (let i = later.length - 1; i >= 0; i--) if (later[i].at <= tt){ const f = later[i].fn; later.splice(i, 1); f(); }
     if (!S) return;
     S.update(dt);
