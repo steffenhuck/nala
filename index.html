@@ -70,6 +70,15 @@
   .twinkle{animation:twinkle 2.6s ease-in-out infinite alternate;}
   @keyframes twinkle{from{opacity:.35;} to{opacity:1;}}
 
+  #ending{background:#000; transition:opacity 3s ease;}
+  .credits{max-width:440px; width:100%; text-align:center; color:#f4efe6; padding:20px 18px;}
+  .credits .faces svg{width:100px; height:100px;}
+  .credits .subtitle{font-family:'Fredoka',sans-serif; font-weight:500; font-size:19px; color:#c9bfdc; margin:6px 0 4px;}
+  .credits .small{font-size:14px; color:#a99fbd;}
+  .credits .dedication b{color:#6fd3c6;}
+  .credits .btn.secondary{background:transparent; color:#cfc6dc; border-color:#3a3350; box-shadow:none; margin-top:22px;}
+  .cr{opacity:0; animation:crIn 2.4s ease forwards; animation-delay:var(--d, 0s);}
+  @keyframes crIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
   #endCard .lines{text-align:left; margin:14px 0 4px; padding:0; list-style:none;}
   #endCard .lines li{position:relative; padding-left:28px; margin:9px 0; font-size:15.5px; line-height:1.45;}
   #endCard .lines li:before{content:"🐾"; position:absolute; left:0; top:0;}
@@ -146,17 +155,17 @@
 <!-- ===== the end ===== -->
 <div class="overlay" id="ending" style="display:none;">
   <div class="stack">
-  <div class="card" id="endCard">
-    <div class="faces">
+  <div class="credits" id="endCard">
+    <div class="faces cr" style="--d:0s">
       <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#nalaFace"/></svg>
       <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#poppyFace"/></svg>
     </div>
-    <div class="big">Sisters.</div>
-    <div class="subtitle" style="margin-bottom:4px">Different gardens. Same moon.</div>
+    <div class="big cr" style="--d:.6s">Sisters.</div>
+    <div class="subtitle cr" style="--d:1.8s; margin-bottom:4px">Different gardens. Same moon.</div>
     <ul class="lines" id="endLines"></ul>
-    <button class="btn" id="againBtn">Watch it again</button>
-    <p class="dedication">For <b>Nala</b>, Elly &amp; Ross</p>
-    <p class="small">and for Poppy, who arrives in December</p>
+    <p class="dedication cr" style="--d:9s">For <b>Nala</b>, Elly &amp; Ross</p>
+    <p class="small cr" style="--d:10s">and for Poppy, who arrives in December</p>
+    <button class="btn secondary cr" id="againBtn" style="--d:15s">Watch it again</button>
   </div>
   <footer><a href="https://steffenhuck.github.io/">steffen huck</a></footer>
   </div>
@@ -619,7 +628,8 @@
           if (S.round >= S.rounds){
             S.state = 'end';
             const line = R.poppyWins ? 'Nala let her big sister win.' : 'Nala won. Poppy didn\'t mind. Much.';
-            words(line, 4600); sub(''); after(5, () => S.next = true);
+            words(line, 4600); sub(''); after(5.5, () => S.next = true);
+            chord([N(48), N(55), N(64), N(67), N(72), N(76)], {dur: 5, vol: .14, strum: .06, cutoff: 2800});
             nala.pose = poppy.pose = 'bow'; nala.tailSpeed = poppy.tailSpeed = 26;
           } else {
             S.round++; S.p = 0; S.state = 'tug'; nala.pose = poppy.pose = 'tug'; nala.tailSpeed = poppy.tailSpeed = 14;
@@ -875,9 +885,11 @@
     const trailY = x => 352 + 18*Math.sin(x/58) + 8*Math.sin(x/23);
     const dots = []; for (let x = 70; x <= 560; x += 16) dots.push({x, y: trailY(x)});
     scene.innerHTML = `
-      <defs><linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9a76"/><stop offset=".7" stop-color="#ffd1a1"/><stop offset="1" stop-color="#ffe4b8"/></linearGradient></defs>
+      <defs><linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop id="dk0" offset="0" stop-color="#ff9a76"/><stop id="dk1" offset=".7" stop-color="#ffd1a1"/><stop id="dk2" offset="1" stop-color="#ffe4b8"/></linearGradient></defs>
       <rect width="800" height="420" fill="url(#dusk)"/>
-      <circle cx="690" cy="236" r="62" fill="#ffcf5a"/><circle cx="690" cy="236" r="100" fill="#ffcf5a" opacity=".22"/>
+      <g id="pStars" fill="#fff" opacity="0">${Array.from({length: 40}, (_, i) => `<circle class="twinkle" style="animation-delay:${(i%7)*.4}s" cx="${(i*97 + 31)%800}" cy="${10 + (i*61)%220}" r="${.8 + (i%4)*.4}"/>`).join('')}</g>
+      <g id="pMoon" opacity="0"><circle cx="160" cy="70" r="26" fill="#fff4cf"/><circle cx="160" cy="70" r="46" fill="#fff4cf" opacity=".12"/></g>
+      <g id="pSun"><circle cx="690" cy="236" r="62" fill="#ffcf5a"/><circle cx="690" cy="236" r="100" fill="#ffcf5a" opacity=".22"/></g>
       <path d="M0 290 Q 160 262 330 286 Q 500 258 800 282 L800 330 L0 330 Z" fill="#c89a5a"/>
       ${jacaranda(170, 320, 1)}${jacaranda(420, 316, .75)}
       <rect x="0" y="318" width="800" height="102" fill="#d6b35e"/>
@@ -888,6 +900,7 @@
       <g id="lionGround" style="display:none"><use href="#lion" transform="scale(.6)"/></g>
       <g id="dogs">${dogSVG('poppy')}${dogSVG('nala')}</g>
       <g id="finger" style="display:none"><circle r="16" fill="none" stroke="#fff" stroke-width="3" opacity=".7"/></g>
+      <rect id="pDark" width="800" height="420" fill="#0e0c26" opacity="0" pointer-events="none"/>
       <g id="fxLayer"></g>`;
     const nala = makeDog('nala', 70, 372, .78, 1), poppy = makeDog('poppy', 700, 292, .78, -1);
     nala.pose = 'sniff'; poppy.pose = 'sit';
@@ -932,7 +945,9 @@
       after(6.8, () => { nala.pose = poppy.pose = 'sleep'; nala.tailSpeed = poppy.tailSpeed = 4; S.breathe = true; nala.x += 10; poppy.x -= 10; });
       after(8.0, () => words('Poppy breathes in. Nala breathes in.', 4200));
       after(12.4, () => { words('Sisters.', 3800); heartAt((nala.x + poppy.x)/2, 300, 3); });
-      after(17, () => S.end = true);
+      // the sun goes down, the stars come out, and the lullaby plays once more
+      after(15.5, () => { S.night = 0; song(1.2, {vol: .05, chords: .035, shift: 12}); });
+      after(30, () => S.end = true);
     };
     S.update = (dt) => {
       S.t += dt;
@@ -972,6 +987,16 @@
         if (!poppy.jumpDown) poppy.x = Math.max(poppy.x - dt*16, 680);
       }
       if (S.breathe){ const b = Math.sin(S.t*1.7); nala.breath = b; poppy.breath = b; }
+      if (S.night != null){
+        S.night = Math.min(1, S.night + dt/9); const k = S.night;
+        $('dk0').setAttribute('stop-color', mix('#ff9a76', '#0d1030', k));
+        $('dk1').setAttribute('stop-color', mix('#ffd1a1', '#1d1b44', k));
+        $('dk2').setAttribute('stop-color', mix('#ffe4b8', '#2b2652', k));
+        $('pSun').setAttribute('transform', `translate(0,${(k*140).toFixed(1)})`);
+        $('pStars').setAttribute('opacity', Math.max(0, k*1.3 - .3).toFixed(2));
+        $('pMoon').setAttribute('opacity', Math.max(0, k*1.4 - .4).toFixed(2));
+        $('pDark').setAttribute('opacity', (k*.45).toFixed(2));
+      }
       if (S.run && S.state === 'meet'){
         nala.pose = poppy.pose = 'stand';
         nala.x = Math.min(nala.x + dt*90, 526); nala.gy += (372 - nala.gy)*Math.min(1, dt*4);
@@ -1022,9 +1047,15 @@
     L.push(R.poppyWins ? 'Nala still lets Poppy win. Sometimes.' : 'Nala still wins every tug of war. Poppy pretends not to mind.');
     L.push(R.gave ? 'Poppy kept the lion all those weeks, and brought it back.' : 'Nala kept the lion all those weeks, and gave it to her in the end.');
     L.push('On clear nights, when one of them howls, the other one answers.');
-    $('endLines').innerHTML = L.map(l => `<li>${l}</li>`).join('');
+    $('endLines').innerHTML = L.map((l, i) => `<li class="cr" style="--d:${3.2 + i*1.4}s">${l}</li>`).join('');
+    // restart the reveal animations
+    document.querySelectorAll('#endCard .cr, #endCard .faces, #endCard .big, #endCard > .subtitle').forEach(el => { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; });
     $('film').style.display = 'none'; $('ending').style.display = 'flex';
-    SFX.win();
+    // the music goes on: soft chords, and the lullaby now and then
+    const loop = [[48, 55, 64, 67], [45, 52, 60, 64], [41, 53, 57, 64], [43, 55, 59, 62]];
+    let li = 0;
+    const tick = () => { pad(loop[li % 4], {vol: .045, dur: 9, attack: 2.5}); if (li % 4 === 0) song(1.5, {vol: .035, chords: 0.0001, shift: 12}); li++; };
+    tick(); endLoop = setInterval(tick, 8000);
   }
   function frame(ts){
     raf = requestAnimationFrame(frame);
@@ -1038,7 +1069,9 @@
     S.dogs.forEach(d => renderDog(d, dt, tt));
     if (S.next && !S.going){ S.going = true; nextScene(); }
   }
+  let endLoop = 0;
   function begin(){
+    clearInterval(endLoop); endLoop = 0;
     resetR(); ending = false;
     $('landing').style.display = 'none'; $('ending').style.display = 'none'; $('film').style.display = 'flex';
     $('fade').style.opacity = 1;
