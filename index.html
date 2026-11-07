@@ -461,12 +461,6 @@
       <g id="dogs">${dogSVG('nala')}${dogSVG('poppy')}</g>
       <path d="M170 330 Q 170 392 400 396 Q 630 392 630 330 Q 600 368 400 370 Q 200 368 170 330 Z" fill="#8f5f2e"/>
       ${Array.from({length: 12}, (_, i) => `<path d="M${200 + i*36} 352 q 10 18 0 34" stroke="#7a4f24" stroke-width="3" fill="none"/>`).join('')}
-      <g id="breathRing" opacity="0">
-        <circle id="ringP" cx="0" cy="0" r="20" fill="none" stroke="#ffd79a" stroke-width="4"/>
-        <text id="ringT" x="0" y="6" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="600" font-size="16" fill="#ffd79a">in</text>
-      </g>
-      <text id="cue" x="400" y="92" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="46" fill="#ffd79a" opacity="0" style="paint-order:stroke" stroke="#3b2d45" stroke-width="6">HOLD</text>
-      <g id="prog" opacity="0">${Array.from({length: 5}, (_, i) => `<text id="pg${i}" x="${340 + i*30}" y="128" text-anchor="middle" font-size="22" opacity=".25">❤️</text>`).join('')}</g>
       <g id="hearts">
         <text id="hN" x="0" y="0" text-anchor="middle" font-size="28">❤️</text>
         <text id="hP" x="0" y="0" text-anchor="middle" font-size="28">❤️</text>
@@ -475,52 +469,36 @@
     const nala = makeDog('nala', 236, 338, .72, 1), poppy = makeDog('poppy', 470, 338, .72, -1);
     nala.pose = 'sleep'; poppy.pose = 'sleep';
     bindDog(nala); bindDog(poppy);
-    const S = {dogs: [nala, poppy], t: 0, holding: false, close: 0, sync: 0, done: false, phase: 'wake', pad: 0, hint: 0, marks: {}};
+    const S = {dogs: [nala, poppy], t: 0, holding: false, close: 0, sync: 0, done: false, phase: 'wake', pad: 0};
     const PER = 3.6;
-    sub('Hold anywhere to <b>snuggle up</b> to Poppy.');
+    sub('<b>Hold</b> anywhere, and Nala snuggles up to Poppy.');
     S.down = () => { S.holding = true; };
     S.up = () => { S.holding = false; };
     S.update = (dt) => {
       S.t += dt;
       if ((S.pad -= dt) <= 0){ S.pad = 6.5; pad([53, 57, 60, 64, 69], {vol: .06}); }
-      const ph = (S.t / PER)*Math.PI*2, inhale = Math.cos(ph) > 0;
+      const ph = (S.t / PER)*Math.PI*2;
       poppy.breath = Math.sin(ph);
-      // Nala breathes with you: hold = breathe in
-      nala.breath += ((S.holding ? 1 : -1) - nala.breath)*Math.min(1, dt*1.8);
       if (S.holding && S.close < 1){ S.close = Math.min(1, S.close + dt*.55); nala.x = lerp(236, 352, S.close); nala.moving = S.close < 1; }
       else nala.moving = false;
-      if (S.close >= 1 && !S.done){
-        if (S.phase === 'wake'){ S.phase = 'sync'; sub('Now <b>breathe with her</b>. Hold when it says <b>HOLD</b>. Let go when it says <b>LET GO</b>.'); }
-        // forgiving: what she was doing a moment ago counts too, so reaction time doesn't matter
-        const was = Math.cos(((S.t - .45)/PER)*Math.PI*2) > 0;
-        const good = S.holding === inhale || S.holding === was;
-        S.sync = clamp(S.sync + (good ? dt*.11 : -dt*.02), 0, 1);
-        [.34, .67].forEach(m => { if (S.sync >= m && !S.marks[m]){ S.marks[m] = 1; tune(m < .5 ? POPPY : NALA, 0, .32, .06, 'sine'); } });
-        if (S.sync >= 1 || S.t > 40){
-          S.done = true; R.sync = S.sync;
-          if (S.sync >= 1){ words('Two hearts, one beat.', 4200); tune(POPPY, 0, .34, .07, 'sine'); tune(NALA, 0, .34, .06, 'sine'); heartAt(400, 250, 5); }
-          else words('Close enough. Warm enough.', 4200);
-          sub(''); after(5, () => S.next = true);
-        }
+      if (S.close >= 1 && S.phase === 'wake'){
+        S.phase = 'sync'; S.syncT = 0; sub('');
+        words('Poppy breathes in. Nala breathes in.', 3600);
+        after(4, () => words('Poppy breathes out. So does Nala.', 3600));
+        after(8, () => { words('Two hearts, one beat.', 4200); tune(POPPY, 0, .34, .07, 'sine'); tune(NALA, 0, .34, .06, 'sine'); heartAt(410, 250, 5); });
+        after(13, () => S.next = true);
+        tune(POPPY, .6, .34, .05, 'sine');
       }
-      // the breathing ring over Poppy
-      const ring = $('breathRing');
-      ring.setAttribute('opacity', S.phase === 'sync' && !S.done ? .9 : 0);
-      const cue = $('cue'), on = S.phase === 'sync' && !S.done;
-      cue.setAttribute('opacity', on ? 1 : 0);
-      cue.textContent = inhale ? 'HOLD' : 'LET GO';
-      cue.setAttribute('fill', inhale ? '#ffd79a' : '#b9d6ff');
-      $('prog').setAttribute('opacity', on || S.done ? 1 : 0);
-      for (let i = 0; i < 5; i++) $('pg' + i).setAttribute('opacity', S.sync >= (i + 1)/5 - .001 ? 1 : .25);
-      ring.setAttribute('transform', `translate(${poppy.x - 6},${poppy.gy - 118})`);
-      $('ringP').setAttribute('r', (16 + 10*(poppy.breath + 1)/2).toFixed(1));
-      $('ringT').textContent = inhale ? 'in' : 'out';
-      // two hearts above: Nala's beats faster until you breathe together
+      // Nala's breath slowly falls into step with Poppy's
+      if (S.phase === 'sync'){ S.syncT += dt; S.sync = Math.min(1, S.syncT/8); }
+      const own = Math.sin(S.t*2.6);
+      nala.breath = lerp(own*.6, poppy.breath, S.sync);
+      // two hearts: Nala's beats faster, then they meet
       const rateP = 1.4, rateN = lerp(2.3, 1.4, S.sync);
       S.hp = (S.hp || 0) + dt*rateP; S.hn = (S.hn || 0) + dt*rateN;
       if (S.sync > .8) S.hn += (S.hp - S.hn)*Math.min(1, dt*2);
       const beat = v => 1 + .25*Math.pow(Math.max(0, Math.sin(v*Math.PI*2)), 8);
-      const gap = lerp(70, 0, Math.max(0, (S.sync - .6)/.4));
+      const gap = lerp(70, 0, Math.max(0, (S.sync - .5)/.5));
       $('hP').setAttribute('transform', `translate(${410 + gap/2},${250}) scale(${beat(S.hp).toFixed(2)})`);
       $('hN').setAttribute('transform', `translate(${410 - gap/2},${250}) scale(${beat(S.hn).toFixed(2)})`);
       $('hearts').setAttribute('opacity', S.close >= 1 ? .95 : 0);
@@ -564,7 +542,7 @@
     const nala = makeDog('nala', 290, 372, .82, 1), poppy = makeDog('poppy', 510, 372, .82, -1);
     nala.pose = poppy.pose = 'tug';
     bindDog(nala); bindDog(poppy);
-    const S = {dogs: [nala, poppy], t: 0, p: 0, round: 1, rounds: 3, state: 'tug', pause: 0, taps: 0, idle: 0};
+    const S = {dogs: [nala, poppy], t: 0, p: 0, round: 1, rounds: 1, state: 'tug', pause: 0, taps: 0, idle: 0, said: false};
     sub('<b>Tap</b> to tug.');
     S.down = () => {
       if (S.state !== 'tug') return;
@@ -583,7 +561,8 @@
       S.t += dt;
       if (S.state === 'tug'){
         S.idle += dt;
-        S.p += dt*.36;                      // Poppy pulls, all the time
+        S.p += dt*(S.taps ? .3 : .06);      // Poppy pulls, all the time (gently, until you start)
+        if (!S.said && S.t > 3.5){ S.said = true; sub('<b>Keep tapping</b> to win… or <b>stop</b>, and let Poppy win.'); }
         if (S.p <= -1) roundEnd('nala');
         else if (S.p >= 1) roundEnd('poppy');
       } else if (S.state === 'won'){
@@ -592,8 +571,7 @@
           $('glow').setAttribute('opacity', 0);
           if (S.round >= S.rounds){
             S.state = 'end';
-            const line = R.poppyWins === 0 ? 'Nala won every time. Poppy didn\'t mind. Much.'
-              : R.nalaWins === 0 ? 'Poppy won every time. Nala let her.' : 'Sometimes one won. Sometimes the other.';
+            const line = R.poppyWins ? 'Nala let her big sister win.' : 'Nala won. Poppy didn\'t mind. Much.';
             words(line, 4600); sub(''); after(5, () => S.next = true);
             nala.pose = poppy.pose = 'bow'; nala.tailSpeed = poppy.tailSpeed = 26;
           } else {
@@ -614,7 +592,7 @@
         $('sock').setAttribute('d', d); $('sockStripe').setAttribute('d', d);
       }
       $('glow').setAttribute('transform', `translate(${poppy.x + 10},${poppy.gy - 80})`);
-      $('score').textContent = S.state === 'end' ? '' : `Round ${S.round} of ${S.rounds}`;
+      $('score').textContent = '';
     };
     return S;
   }
@@ -653,7 +631,7 @@
     placeLion();
     S.down = (p) => {
       S.last = p;
-      if (S.state === 'give' && Math.hypot(p.x - lion.x, p.y - lion.y) < 52){ lion.drag = true; }
+      if (S.state === 'give' && Math.hypot(p.x - lion.x, p.y - lion.y) < 80){ give(true); }
     };
     S.move = (p) => {
       if (S.state === 'look' && S.last){
@@ -664,7 +642,7 @@
           chord([N(48),N(55),N(64),N(67),N(72),N(76)], {dur: 4.5, vol: .16, strum: .06, cutoff: 3000}); SFX.sparkle();
           after(4.6, () => {
             SFX.door(); SFX.engine(); poppy.pose = 'stand'; poppy.dir = -1; poppy.tailSpeed = 6;
-            after(1.6, () => { S.state = 'give'; S.giveT = 0; sub('Poppy has to go. <b>Give her your lion?</b> Drag it to her. Or keep it.'); });
+            after(1.6, () => { S.state = 'give'; S.giveT = 0; sub('Poppy has to go. <b>Tap the lion</b> to give it to her. Or don\'t.'); $('lionToy').classList.add('twinkle'); });
           });
         }
       }
@@ -682,6 +660,7 @@
     };
     function give(gave){
       S.state = 'leaving'; R.gave = gave; sub('');
+      $('lionToy').classList.remove('twinkle');
       if (gave){ $('lionToy').style.display = 'none'; poppy.el.held.style.display = ''; SFX.sparkle(); tune(NALA, 0, .3, .06, 'sine'); }
       else { nala.pose = 'lie'; lion.x = nala.x + 46; lion.y = nala.gy - 4; }
       after(1.4, () => {
@@ -706,7 +685,7 @@
       if (S.state === 'look' || S.state === 'lit'){ nala.pose = poppy.pose = 'sit'; }
       if (S.state === 'give'){
         S.giveT += dt;
-        if (S.giveT > 11 && !lion.drag) give(false);
+        if (S.giveT > 9) give(false);
       }
       if (poppy.jump){
         const j = poppy.jump; j.k = Math.min(1, j.k + dt*1.6);
@@ -749,14 +728,15 @@
     nala.pose = poppy.pose = 'sit';
     bindDog(nala); bindDog(poppy);
     const S = {dogs: [nala, poppy], t: 0, state: 'wait', calls: 0, held: 0, h: null, lit: 0};
-    sub('Night. Different houses. <b>Hold</b> to howl. Let go, and listen.');
+    sub('Night. Different houses. <b>Tap</b> to howl, then listen.');
     S.down = () => {
       if (S.state !== 'wait') return;
       S.state = 'howl'; S.held = 0; nala.pose = 'howl';
       S.h = howlStart(560, .2, -.35);
     };
-    S.up = () => {
-      if (S.state !== 'howl') return;
+    S.tapUp = () => {};
+    S.up = (p) => {
+      if (S.state !== 'howl' || (p !== undefined && S.held < 1.7)) return;
       howlStop(S.h); S.h = null; nala.pose = 'sit';
       const len = clamp(S.held, .6, 3);
       S.calls++; S.state = 'listen';
@@ -780,7 +760,7 @@
     };
     S.update = (dt) => {
       S.t += dt;
-      if (S.state === 'howl'){ S.held += dt; if (S.held > 3.2) S.up(); }
+      if (S.state === 'howl'){ S.held += dt; if (S.held > 1.7) S.up(); }
       if ((S.lit -= dt) <= 0){ S.lit = 8; pad([45, 52, 57, 60, 64], {vol: .045, dur: 8, attack: 2}); }
     };
     S.cleanup = () => { if (S.h) howlStop(S.h); };
@@ -814,7 +794,7 @@
     poppy.el.g.style.display = 'none';
     if (!R.gave) nala.el.held.style.display = '';      // she kept it, so she carries it
     const S = {dogs: [nala, poppy], t: 0, state: 'trail', target: 70, finger: null, onTrail: false, lost: 0, sniffT: 0, pad: 0};
-    sub('Weeks later. A smell on the wind… <b>Drag along the trail</b> and Nala follows her nose.');
+    sub('Weeks later. A smell on the wind… <b>Hold</b>, and Nala follows her nose.');
     S.down = (p) => { S.finger = p; };
     S.move = (p) => { if (S.finger) S.finger = p; };
     S.up = () => { S.finger = null; };
@@ -853,19 +833,15 @@
       $('fly').setAttribute('transform', `translate(${fx.toFixed(1)},${fy.toFixed(1)}) scale(${(.6 + .4*Math.abs(Math.sin(S.t*12))).toFixed(2)},1)`);
       if (S.state === 'trail'){
         const f = S.finger;
-        $('finger').style.display = f ? '' : 'none';
+        $('finger').style.display = 'none';
         if (f){
           $('finger').setAttribute('transform', `translate(${f.x.toFixed(1)},${f.y.toFixed(1)})`);
-          S.onTrail = Math.abs(f.y - trailY(f.x)) < 42 && f.x > nala.x - 40;
-          if (S.onTrail) S.target = Math.max(S.target, Math.min(f.x, nala.x + 160));
-          else S.lost += dt;
+          S.onTrail = true; S.target = nala.x + 40;
         }
         const go = S.target > nala.x + 2;
-        if (go){ nala.x = Math.min(S.target, nala.x + dt*95); nala.gy = trailY(nala.x) + 12; }
+        if (go){ nala.x = Math.min(S.target, nala.x + dt*70); nala.gy = trailY(nala.x) + 12; }
         nala.moving = go; nala.pose = 'sniff';
         if (go && (S.sniffT -= dt) <= 0){ S.sniffT = 1.1; SFX.sniff(); }
-        if (f && !S.onTrail && S.lost > 1.2){ sub('She\'s lost the scent. <b>Find the trail again.</b>'); S.lost = 0; }
-        else if (f && S.onTrail && /lost/.test(subEl.innerHTML)) sub('That\'s it. <b>Follow the trail.</b>');
         // the scent: dots near her nose glow
         dots.forEach((p, i) => {
           const dd = p.x - nala.x;
@@ -928,9 +904,8 @@
   function finish(){
     ending = true; S = null;
     const L = [];
-    L.push(R.sync >= .8 ? 'They still sleep the same way: nose to tail, breathing together.' : 'They still argue about who gets the warm side of the basket.');
-    L.push(R.poppyWins === 0 ? 'Nala still wins every tug of war. Poppy pretends not to mind.'
-         : R.nalaWins === 0 ? 'Nala still lets Poppy win. Every single time.' : 'Nala still lets Poppy win. Sometimes.');
+    L.push('They still sleep the same way: nose to tail, breathing together.');
+    L.push(R.poppyWins ? 'Nala still lets Poppy win. Sometimes.' : 'Nala still wins every tug of war. Poppy pretends not to mind.');
     L.push(R.gave ? 'Poppy kept the lion all those weeks, and brought it back.' : 'Nala kept the lion all those weeks, and gave it to her in the end.');
     L.push('On clear nights, when one of them howls, the other one answers.');
     $('endLines').innerHTML = L.map(l => `<li>${l}</li>`).join('');
