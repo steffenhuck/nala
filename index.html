@@ -790,11 +790,13 @@
         <path d="M10 400 V 230 L 150 140 L 290 230 V 400 Z" fill="#2a2440"/>
         <rect x="66" y="196" width="168" height="140" rx="8" fill="#ffd98a"/>
         <g id="slotWin"></g>
+        <g id="lionWinN" style="display:none" transform="translate(206,326) scale(.42)"><use href="#lion"/></g>
         <rect x="60" y="190" width="180" height="152" rx="10" fill="none" stroke="#2a2440" stroke-width="12"/>
         <rect x="56" y="336" width="188" height="12" rx="4" fill="#3a3352"/>
         <path d="M510 400 V 230 L 650 140 L 790 230 V 400 Z" fill="#2a2440"/>
         <rect x="566" y="196" width="168" height="140" rx="8" fill="#ffd98a"/>
         <g id="farPoppy">${dogSVG('poppy')}</g>
+        <g id="lionWinP" style="display:none" transform="translate(596,326) scale(.42)"><use href="#lion"/></g>
         <rect x="560" y="190" width="180" height="152" rx="10" fill="none" stroke="#2a2440" stroke-width="12"/>
         <rect x="556" y="336" width="188" height="12" rx="4" fill="#3a3352"/>
       </g>
@@ -805,6 +807,7 @@
         <ellipse cx="400" cy="330" rx="250" ry="54" fill="#8a6a8a"/>
         <ellipse cx="400" cy="326" rx="228" ry="40" fill="#cdb6d0"/>
         <g id="slotIn"></g>
+        <g id="lionIn" style="display:none" transform="translate(318,338) scale(.5)"><use href="#lion"/></g>
         <path d="M150 330 Q 150 396 400 400 Q 650 396 650 330 Q 620 372 400 374 Q 180 372 150 330 Z" fill="#6f5272"/>
       </g>
       <g id="fxLayer"></g>`;
@@ -814,12 +817,14 @@
     nala.pose = 'sleep'; poppy.pose = 'sit';
     bindDog(nala); bindDog(poppy);
     const S = {dogs: [nala, poppy], t: 0, state: 'inside', calls: 0, h: null, lit: 0};
+    if (R.gave) $('lionWinP').style.display = ''; else $('lionIn').style.display = '';
     sub('');
     after(1.2, () => words('A new home. A big new basket.', 3600));
     after(5.2, () => words('Too big.', 3200));
     after(9.2, () => {
       $('inside').style.opacity = 0;
       $('slotWin').appendChild(nala.el.g);
+      if (!R.gave) $('lionWinN').style.display = '';
       nala.x = 150; nala.gy = 330; nala.s = .55; nala.pose = 'sit';
       after(1.8, () => { S.state = 'wait'; sub('Night. <b>Tap</b>, and Nala sings to the moon. Then listen.'); });
     });
@@ -897,6 +902,7 @@
     const meet = () => {
       S.state = 'meet'; sub(''); nala.moving = false; nala.pose = 'look';
       poppy.el.g.style.display = ''; poppy.pose = 'stand';
+      if (R.gave) poppy.el.held.style.display = '';
       after(1.6, () => { poppy.jumpDown = {k: 0}; });
       // they walk up slowly… stop… sniff… and then they know
       after(3.2, () => { S.walk = true; nala.moving = poppy.moving = true; });
@@ -917,7 +923,8 @@
         if (R.gave){ poppy.el.held.style.display = 'none'; }
         else { nala.el.held.style.display = 'none'; }
         const lg = $('lionGround'); lg.style.display = '';
-        lg.setAttribute('transform', `translate(${((nala.x + poppy.x)/2).toFixed(1)},${nala.gy - 6})`);
+        const lx = R.gave ? nala.x + 62 : poppy.x - 62;      // at the other sister's feet
+        lg.setAttribute('transform', `translate(${lx.toFixed(1)},${nala.gy - 4})`);
         SFX.sparkle();
         words(R.gave ? 'She brought the lion back.' : 'Nala gives her the lion.', 4000);
       });
