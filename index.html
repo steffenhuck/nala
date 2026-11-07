@@ -673,7 +673,7 @@
     bindDog(nala); bindDog(poppy);
     const lion = {x: 340, y: 256, home: {x: 340, y: 256}, drag: false, shown: false};
     const S = {dogs: [nala, poppy], t: 0, light: 0, state: 'look', last: null, chords: {}, giveT: 0, walkT: 0};
-    sub('<b>Drag across the sky</b> to bring up the sun.');
+    sub('<b>Swipe across the sky</b> to bring up the sun.');
     const placeLion = () => { $('lionToy').setAttribute('transform', `translate(${lion.x.toFixed(1)},${lion.y.toFixed(1)}) scale(.62)`); };
     placeLion();
     S.down = (p) => {
@@ -681,8 +681,8 @@
       if (S.state === 'give' && Math.hypot(p.x - lion.x, p.y - lion.y) < 80){ give(true); }
     };
     S.move = (p) => {
-      if (S.state === 'look' && S.last){
-        S.light = Math.min(1, S.light + Math.hypot(p.x - S.last.x, p.y - S.last.y)/1500);
+      if (S.state === 'look' && S.last && Math.hypot(p.x - S.last.x, p.y - S.last.y) > 2 && !S.rising){ S.rising = true; sub(''); }
+      if (false){
         [.25, .5, .75].forEach((m, i) => { if (S.light >= m && !S.chords[m]){ S.chords[m] = 1; pad([[57,60,64,69],[53,57,60,65],[55,59,62,67]][i], {dur: 5, vol: .07, attack: .6}); } });
         if (S.light >= 1){
           S.state = 'lit'; sub(''); words('As far as the light goes.', 4200);
@@ -721,6 +721,19 @@
     }
     S.update = (dt) => {
       S.t += dt;
+      if (S.rising && S.state === 'look'){
+        S.light = Math.min(1, S.light + dt/5);
+        [.25, .5, .75].forEach((m, i) => { if (S.light >= m && !S.chords[m]){ S.chords[m] = 1; pad([[57,60,64,69],[53,57,60,65],[55,59,62,67]][i], {dur: 5, vol: .07, attack: .6}); } });
+        if (S.light >= 1){
+          S.state = 'lit'; words('As far as the light goes.', 4200);
+          chord([N(48),N(55),N(64),N(67),N(72),N(76)], {dur: 4.5, vol: .16, strum: .06, cutoff: 3000}); SFX.sparkle();
+          after(4.8, () => {
+            poppy.pose = 'stand'; poppy.dir = -1; poppy.tailSpeed = 4;
+            words('Someone is calling Poppy. Her new family is here.', 4000);
+            after(4.2, () => { S.state = 'give'; S.giveT = 0; sub('Poppy has to go. <b>Tap the lion</b> to give it to her. Or don\'t.'); $('lionToy').classList.add('twinkle'); });
+          });
+        }
+      }
       const L = S.light;
       $('sk0').setAttribute('stop-color', mix3('#14183a', '#ff8d6b', '#8fd0ff', L));
       $('sk1').setAttribute('stop-color', mix3('#2a2550', '#ffd39a', '#ffeccc', L));
@@ -886,9 +899,9 @@
       after(1.6, () => { poppy.jumpDown = {k: 0}; });
       // they walk up slowly… stop… sniff… and then they know
       after(3.2, () => { S.walk = true; nala.moving = poppy.moving = true; });
-      after(5.6, () => { S.walk = false; nala.moving = poppy.moving = false; nala.pose = poppy.pose = 'sniff'; SFX.sniff(); setTimeout(SFX.sniff, 900); words('…', 2000); });
+      after(5.6, () => { S.walk = false; nala.moving = poppy.moving = false; nala.pose = poppy.pose = 'sniff'; words('…', 2000); });
       after(8.0, () => { nala.pose = poppy.pose = 'look'; });
-      after(9.0, () => { nala.hop = 1; poppy.hop = 1; SFX.yip(); setTimeout(SFX.softWoof, 250); nala.tailSpeed = poppy.tailSpeed = 32; words('It\'s her.', 2400); });
+      after(9.0, () => { nala.hop = 1; poppy.hop = 1; nala.tailSpeed = poppy.tailSpeed = 32; words('It\'s her.', 2400); });
       after(9.6, () => { S.run = true; nala.moving = poppy.moving = true; });
     };
     const together = () => {
@@ -929,7 +942,6 @@
         const go = S.target > nala.x + 2;
         if (go){ nala.x = Math.min(S.target, nala.x + dt*70); nala.gy = trailY(nala.x) + 12; }
         nala.moving = go; nala.pose = 'sniff';
-        if (go && (S.sniffT -= dt) <= 0){ S.sniffT = 1.1; SFX.sniff(); }
         // the scent: dots near her nose glow
         dots.forEach((p, i) => {
           const dd = p.x - nala.x;
