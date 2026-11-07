@@ -465,6 +465,8 @@
         <circle id="ringP" cx="0" cy="0" r="20" fill="none" stroke="#ffd79a" stroke-width="4"/>
         <text id="ringT" x="0" y="6" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="600" font-size="16" fill="#ffd79a">in</text>
       </g>
+      <text id="cue" x="400" y="92" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="46" fill="#ffd79a" opacity="0" style="paint-order:stroke" stroke="#3b2d45" stroke-width="6">HOLD</text>
+      <g id="prog" opacity="0">${Array.from({length: 5}, (_, i) => `<text id="pg${i}" x="${340 + i*30}" y="128" text-anchor="middle" font-size="22" opacity=".25">❤️</text>`).join('')}</g>
       <g id="hearts">
         <text id="hN" x="0" y="0" text-anchor="middle" font-size="28">❤️</text>
         <text id="hP" x="0" y="0" text-anchor="middle" font-size="28">❤️</text>
@@ -488,11 +490,13 @@
       if (S.holding && S.close < 1){ S.close = Math.min(1, S.close + dt*.55); nala.x = lerp(236, 352, S.close); nala.moving = S.close < 1; }
       else nala.moving = false;
       if (S.close >= 1 && !S.done){
-        if (S.phase === 'wake'){ S.phase = 'sync'; sub('Now <b>breathe with her</b>: hold while Poppy breathes <b>in</b>, let go while she breathes <b>out</b>.'); }
-        const good = S.holding === inhale;
-        S.sync = clamp(S.sync + (good ? dt*.075 : -dt*.035), 0, 1);
+        if (S.phase === 'wake'){ S.phase = 'sync'; sub('Now <b>breathe with her</b>. Hold when it says <b>HOLD</b>. Let go when it says <b>LET GO</b>.'); }
+        // forgiving: what she was doing a moment ago counts too, so reaction time doesn't matter
+        const was = Math.cos(((S.t - .45)/PER)*Math.PI*2) > 0;
+        const good = S.holding === inhale || S.holding === was;
+        S.sync = clamp(S.sync + (good ? dt*.11 : -dt*.02), 0, 1);
         [.34, .67].forEach(m => { if (S.sync >= m && !S.marks[m]){ S.marks[m] = 1; tune(m < .5 ? POPPY : NALA, 0, .32, .06, 'sine'); } });
-        if (S.sync >= 1 || S.t > 48){
+        if (S.sync >= 1 || S.t > 40){
           S.done = true; R.sync = S.sync;
           if (S.sync >= 1){ words('Two hearts, one beat.', 4200); tune(POPPY, 0, .34, .07, 'sine'); tune(NALA, 0, .34, .06, 'sine'); heartAt(400, 250, 5); }
           else words('Close enough. Warm enough.', 4200);
@@ -502,6 +506,12 @@
       // the breathing ring over Poppy
       const ring = $('breathRing');
       ring.setAttribute('opacity', S.phase === 'sync' && !S.done ? .9 : 0);
+      const cue = $('cue'), on = S.phase === 'sync' && !S.done;
+      cue.setAttribute('opacity', on ? 1 : 0);
+      cue.textContent = inhale ? 'HOLD' : 'LET GO';
+      cue.setAttribute('fill', inhale ? '#ffd79a' : '#b9d6ff');
+      $('prog').setAttribute('opacity', on || S.done ? 1 : 0);
+      for (let i = 0; i < 5; i++) $('pg' + i).setAttribute('opacity', S.sync >= (i + 1)/5 - .001 ? 1 : .25);
       ring.setAttribute('transform', `translate(${poppy.x - 6},${poppy.gy - 118})`);
       $('ringP').setAttribute('r', (16 + 10*(poppy.breath + 1)/2).toFixed(1));
       $('ringT').textContent = inhale ? 'in' : 'out';
