@@ -523,7 +523,7 @@
         S.phase = 'sync'; S.syncT = 0; sub('');
         words('Poppy breathes in. Nala breathes in.', 3600);
         after(4, () => words('Poppy breathes out. So does Nala.', 3600));
-        after(8, () => { words('Two hearts, one beat.', 4800); heartAt(410, 250, 5); });
+        after(8, () => { words('Two hearts, one beat.', 4800); S.big = 0; });
         after(14, () => S.next = true);
         song(.6, {vol: .05, chords: .035, shift: 12});
       }
@@ -537,8 +537,15 @@
       if (S.sync > .8) S.hn += (S.hp - S.hn)*Math.min(1, dt*2);
       const beat = v => 1 + .25*Math.pow(Math.max(0, Math.sin(v*Math.PI*2)), 8);
       const gap = lerp(70, 0, Math.max(0, (S.sync - .5)/.5));
-      $('hP').setAttribute('transform', `translate(${410 + gap/2},${250}) scale(${beat(S.hp).toFixed(2)})`);
-      $('hN').setAttribute('transform', `translate(${410 - gap/2},${250}) scale(${beat(S.hn).toFixed(2)})`);
+      if (S.big != null){
+        S.big = Math.min(1, S.big + dt*.8);
+        const k = 1 + 1.8*(1 - Math.pow(1 - S.big, 3));
+        $('hN').style.display = 'none';
+        $('hP').setAttribute('transform', `translate(410,${(250 - 30*S.big).toFixed(1)}) scale(${(k*beat(S.hp)).toFixed(2)})`);
+      } else {
+        $('hP').setAttribute('transform', `translate(${410 + gap/2},${250}) scale(${beat(S.hp).toFixed(2)})`);
+        $('hN').setAttribute('transform', `translate(${410 - gap/2},${250}) scale(${beat(S.hn).toFixed(2)})`);
+      }
       $('hearts').setAttribute('opacity', S.close >= 1 ? .95 : 0);
     };
     return S;
@@ -771,7 +778,7 @@
   // FOUR · Night — Call
   // =====================================================================
   function sceneNight(){
-    const arc = Array.from({length: 9}, (_, i) => { const u = (i + 1)/10; return {x: lerp(190, 640, u), y: 200 - Math.sin(Math.PI*u)*120}; });
+    const arc = Array.from({length: 9}, (_, i) => { const u = (i + 1)/10; return {x: lerp(236, 564, u), y: 205 - Math.sin(Math.PI*u)*98}; });
     scene.innerHTML = `
       <defs><linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1030"/><stop offset="1" stop-color="#26244f"/></linearGradient></defs>
       <g id="outside">
@@ -785,10 +792,11 @@
         <g id="slotWin"></g>
         <rect x="60" y="190" width="180" height="152" rx="10" fill="none" stroke="#2a2440" stroke-width="12"/>
         <rect x="56" y="336" width="188" height="12" rx="4" fill="#3a3352"/>
-        <path d="M650 330 V 270 L 700 238 L 750 270 V 330 Z" fill="#221d36"/>
-        <rect x="682" y="266" width="36" height="32" rx="3" fill="#ffd98a"/>
+        <path d="M510 400 V 230 L 650 140 L 790 230 V 400 Z" fill="#2a2440"/>
+        <rect x="566" y="196" width="168" height="140" rx="8" fill="#ffd98a"/>
         <g id="farPoppy">${dogSVG('poppy')}</g>
-        <rect x="679" y="263" width="42" height="38" rx="4" fill="none" stroke="#221d36" stroke-width="5"/>
+        <rect x="560" y="190" width="180" height="152" rx="10" fill="none" stroke="#2a2440" stroke-width="12"/>
+        <rect x="556" y="336" width="188" height="12" rx="4" fill="#3a3352"/>
       </g>
       <g id="inside" style="transition:opacity 1.6s ease">
         <rect width="800" height="420" fill="#2e2638"/>
@@ -802,7 +810,7 @@
       <g id="fxLayer"></g>`;
     // Nala lives in one place in the picture, then moves to the window
     const holder = document.createElementNS(NS, 'g'); holder.innerHTML = dogSVG('nala'); $('slotIn').appendChild(holder.firstElementChild);
-    const nala = makeDog('nala', 250, 342, .7, 1), poppy = makeDog('poppy', 700, 296, .22, -1);
+    const nala = makeDog('nala', 250, 342, .7, 1), poppy = makeDog('poppy', 650, 330, .55, -1);
     nala.pose = 'sleep'; poppy.pose = 'sit';
     bindDog(nala); bindDog(poppy);
     const S = {dogs: [nala, poppy], t: 0, state: 'inside', calls: 0, h: null, lit: 0};
